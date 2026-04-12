@@ -1,0 +1,17 @@
+[project]
+name = "thenvoi-chatroom-demo"
+version = "0.1.0"
+description = "Chatroom simulation with 2 Claude Agent SDK agents on the Thenvoi platform"
+requires-python = ">=3.11"
+dependencies = [
+    "claude-agent-sdk",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+thenvoi = [
+    "thenvoi-sdk[claude_sdk] @ git+https://github.com/thenvoi/thenvoi-sdk-python.git",
+]
+
+[tool.uv.sources]
+thenvoi-sdk = { git = "https://github.com/thenvoi/thenvoi-sdk-python.git" }

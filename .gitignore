@@ -1,0 +1,29 @@
+# Database
+contract-swarm.db
+contract-swarm.db-wal
+contract-swarm.db-shm
+
+# Python
+agents/.venv/
+agents/__pycache__/
+agents/*.pyc
+agents/.env
+agents/agent_config.yaml
+
+# Node
+web/node_modules/
+web/.next/
+web/.env.local
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Playwright
+.playwright-mcp/
+web/.playwright-mcp/
+
+# Node (root-level patterns)
+node_modules/
+.next/

@@ -1,0 +1,11 @@
+# Thenvoi agent credentials
+# Register agents at https://app.thenvoi.com, then fill in IDs and keys below.
+# Copy this to agent_config.yaml (do not commit the real file).
+
+contract_agent:
+  agent_id: ""
+  api_key: ""
+
+law_agent:
+  agent_id: ""
+  api_key: ""

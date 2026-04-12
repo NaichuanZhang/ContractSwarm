@@ -1,0 +1,12 @@
+# Thenvoi Agent Credentials
+# Create agents at https://app.thenvoi.com, then fill in credentials below.
+# Copy this file to agent_config.yaml and add your values.
+# NEVER commit agent_config.yaml to git.
+
+alice_agent:
+  agent_id: ""   # UUID from Thenvoi platform
+  api_key: ""    # One-time API key shown at agent creation
+
+bob_agent:
+  agent_id: ""
+  api_key: ""
