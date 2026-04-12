@@ -22,7 +22,7 @@ uvicorn server:app --host 0.0.0.0 --port 8000   # Start orchestration API
 sqlite3 contract-swarm.db < scripts/setup-db.sql  # Initialize/reset schema (from project root)
 
 # Sample data
-python scripts/generate-sample-contracts.py        # Generate 3 test PDFs in contracts/
+python scripts/generate-sample-contracts.py        # Generate 6 test PDFs in contracts/
 ```
 
 Both servers must be running for end-to-end functionality. The frontend calls the Python backend at `AGENT_BACKEND_URL` (defaults to `http://localhost:8000`).
@@ -53,9 +53,9 @@ Next.js 16 App Router (web/)     Python FastAPI (agents/)
 
 ## Key Conventions
 
-**LawAgent is US-only**: All legal citations must be US federal and state law (CCPA, HIPAA, FTC Act, UCC, state privacy acts). GDPR and non-US law are explicitly prohibited in prompts.
+**LawAgent is US-only**: All legal citations must be CCPA and HIPAA only. All other laws (GDPR, FTC Act, GLBA, UCC, state privacy acts, non-US law) are explicitly prohibited in prompts.
 
-**Design system**: Dark-only theme. Gold accent (`#C8A97E`). Risk colors: high=`#E85D4A`, medium=`#D4A843`, low=`#4A9E6E`. Fonts: Playfair Display (headings), DM Sans (body), JetBrains Mono (code). Custom CSS tokens defined in `web/src/app/globals.css`.
+**Design system**: Light theme. Gold accent (`#8B6F47`). Risk colors: high=`#DC3A2A`, medium=`#B8922E`, low=`#2D7A4A`. Background `#FAFAF8`, surface `#F0EDE8`, card `#FFFFFF`. Fonts: Playfair Display (headings), DM Sans (body), JetBrains Mono (code). Custom CSS tokens defined in `web/src/app/globals.css`.
 
 **shadcn/ui uses Base UI** (not Radix). The Accordion has no `type` prop. Check `web/src/components/ui/` source before assuming Radix APIs.
 

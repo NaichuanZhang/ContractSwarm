@@ -193,7 +193,9 @@ STEP 3: Synthesize both agents' findings. Produce a FINAL JSON result in a ```js
 CRITICAL RULES:
 - You MUST use the Agent tool to invoke "contract_agent" and "law_agent"
 - You MUST end with a ```json code block containing the final result
-- Include at least 2-3 clauses with detailed violations
+- Include clauses with violations ONLY if genuine conflicts exist between the contract terms and the vendor use case under CCPA or HIPAA
+- If no genuine violations exist, return empty violations arrays for each clause, set overall_risk to "low", and set recommendation to "eligible"
+- Do NOT fabricate or exaggerate violations — accuracy is more important than finding problems
 - ONLY cite CCPA and HIPAA — no other laws
 - Do NOT cite GDPR, EU directives, or any non-US law
 - The JSON must be valid and complete"""

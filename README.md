@@ -66,10 +66,10 @@ graph TB
     G --> C
     G --> D
 
-    style K fill:#C8A97E,color:#0A0A0A
+    style K fill:#8B6F47,color:#fff
     style L fill:#4A9E6E,color:#fff
     style M fill:#6B5CE7,color:#fff
-    style N fill:#1C1C1C,color:#F5F0EB,stroke:#2A2724
+    style N fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
 ```
 
 ---
@@ -167,7 +167,7 @@ graph LR
     PDF[Contract PDF] -->|pdfplumber| MOD
     MOD -->|Structured JSON| DB[(SQLite)]
 
-    style MOD fill:#C8A97E,color:#0A0A0A
+    style MOD fill:#8B6F47,color:#fff
     style CA fill:#4A9E6E,color:#fff
     style LA fill:#6B5CE7,color:#fff
 ```
@@ -182,10 +182,10 @@ Each contract gets its own independent agent team. All teams run in parallel via
 - Confidentiality / liability / IP rights
 
 **LawAgent** researches US law implications:
-- Federal regulations (CCPA/CPRA, HIPAA, GLBA, FTC Act §5)
-- State privacy laws (Virginia CDPA, Colorado Privacy Act, etc.)
+- CCPA/CPRA (Cal. Civ. Code §1798.100–§1798.199.100)
+- HIPAA (45 C.F.R. Parts 160 and 164)
 - Case law precedents via Midpage API
-- UCC and Restatement of Contracts
+- No other laws are cited (GDPR, FTC Act, state privacy acts, UCC are explicitly excluded)
 
 ---
 
@@ -475,19 +475,19 @@ contract-swarm/
 
 ## Design System
 
-Dark-only theme with warm gold accents.
+Light theme with warm gold accents.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--background` | `#0A0A0A` | Page background |
-| `--card` | `#141414` | Card surfaces |
-| `--surface` | `#1C1C1C` | Elevated surfaces |
-| `--border` | `#2A2724` | Borders and dividers |
-| `--foreground` | `#F5F0EB` | Primary text |
-| `--gold` | `#C8A97E` | Primary accent |
-| `--risk-high` | `#E85D4A` | High risk / critical |
-| `--risk-medium` | `#D4A843` | Medium risk / major |
-| `--risk-low` | `#4A9E6E` | Low risk / compliant |
+| `--background` | `#FAFAF8` | Page background |
+| `--card` | `#FFFFFF` | Card surfaces |
+| `--surface` | `#F0EDE8` | Elevated surfaces |
+| `--border` | `#E5E0DB` | Borders and dividers |
+| `--foreground` | `#1A1A1A` | Primary text |
+| `--gold` | `#8B6F47` | Primary accent |
+| `--risk-high` | `#DC3A2A` | High risk / critical |
+| `--risk-medium` | `#B8922E` | Medium risk / major |
+| `--risk-low` | `#2D7A4A` | Low risk / compliant |
 
 ---
 
