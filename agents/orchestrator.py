@@ -113,8 +113,8 @@ async def _analyze_contract_direct(
             "You are LawAgent, a legal researcher specializing in US federal and state law.\n"
             "When given contract clauses, identify relevant US laws, regulations, and case precedents.\n"
             "For each clause assess: is it enforceable under US law? what US regulations apply? what's the legal risk?\n"
-            "ONLY cite US law (e.g., CCPA §1798.140, HIPAA §164.502, FTC Act §5, state privacy acts, UCC).\n"
-            "Do NOT cite GDPR, EU directives, or any non-US law.\n"
+            "ONLY cite CCPA (e.g., §1798.140, §1798.100) and HIPAA (e.g., §164.502, §164.514).\n"
+            "Do NOT cite any other laws — no GDPR, no FTC Act, no GLBA, no state privacy acts, no UCC.\n"
             "Keep your response concise. Sign as LawAgent."
         ),
         tools=[],
@@ -186,7 +186,7 @@ CRITICAL RULES:
 - You MUST use the Agent tool to invoke "contract_agent" and "law_agent"
 - You MUST end with a ```json code block containing the final result
 - Include at least 2-3 clauses with detailed violations
-- ONLY cite US federal and state laws (CCPA, HIPAA, FTC Act, state privacy laws, UCC, etc.)
+- ONLY cite CCPA and HIPAA — no other laws
 - Do NOT cite GDPR, EU directives, or any non-US law
 - The JSON must be valid and complete"""
 
