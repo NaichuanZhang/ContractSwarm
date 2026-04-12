@@ -4,6 +4,8 @@
 
 ContractSwarm is an AI-powered compliance tool that helps in-house lawyers assess whether they can legally onboard a new third-party vendor that will process their clients' data. It deploys a swarm of Claude AI agents to analyze every client contract in parallel — surfacing risks, violations, and draft amendments in minutes instead of weeks.
 
+![ContractSwarm — Home Page](home-page.png)
+
 ![ContractSwarm — Agent Swarm analyzing contracts](swarm-page.png)
 
 ---
