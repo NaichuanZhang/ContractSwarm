@@ -19,7 +19,7 @@ export async function GET() {
         // Derive client name from filename: "acme_corp_msa.pdf" -> "Acme Corp"
         const clientName = fileName
           .replace(/\.pdf$/i, "")
-          .replace(/_(?:msa|dpa|nda|services?|agreement|contract)$/i, "")
+          .replace(/_(?:msa|dpa|nda|sow|services?|agreement|contract|engagement)$/i, "")
           .replace(/_/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase());
 
