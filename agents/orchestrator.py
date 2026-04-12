@@ -26,6 +26,10 @@ MIDPAGE_API_KEY = os.getenv("MIDPAGE_API_KEY", "")
 THENVOI_WS_URL = os.getenv("THENVOI_WS_URL", "wss://app.thenvoi.com/api/v1/socket/websocket")
 THENVOI_REST_URL = os.getenv("THENVOI_REST_URL", "https://app.thenvoi.com")
 
+# Truncate contract text to stay within token limits.
+# Each contract appears ONLY in the moderator prompt (not duplicated in subagent defs).
+MAX_CONTRACT_CHARS = 6000
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -49,103 +53,6 @@ def _save_message(
     conn.commit()
 
 
-async def _analyze_contract_with_thenvoi(
-    contract_id: str,
-    assessment_id: str,
-    client_name: str,
-    contract_text: str,
-    vendor_description: str,
-) -> None:
-    """Analyze a single contract using Thenvoi agents in a shared room."""
-    try:
-        from thenvoi import Agent
-        from thenvoi.adapters import ClaudeSDKAdapter
-        from thenvoi.core.types import AdapterFeatures, Emit
-        from thenvoi.config import load_agent_config
-    except ImportError:
-        logger.warning("Thenvoi SDK not available, falling back to direct mode")
-        await _analyze_contract_direct(
-            contract_id, assessment_id, client_name, contract_text, vendor_description
-        )
-        return
-
-    conn = get_connection()
-
-    # Create a room record (thenvoi_chat_id will be set by the platform)
-    room_id = new_id()
-    conn.execute(
-        "INSERT INTO agent_rooms (id, contract_id, thenvoi_chat_id, status, created_at) VALUES (?, ?, ?, 'active', ?)",
-        (room_id, contract_id, "pending", _now()),
-    )
-    conn.commit()
-
-    _save_message(conn, room_id, "Orchestrator", "text",
-                  f"Starting analysis for client: {client_name}")
-
-    try:
-        contract_agent_id, contract_agent_key = load_agent_config("contract_agent")
-        law_agent_id, law_agent_key = load_agent_config("law_agent")
-    except Exception as e:
-        logger.error(f"Failed to load agent config: {e}")
-        _save_message(conn, room_id, "Orchestrator", "error", f"Config error: {e}")
-        await _analyze_contract_direct(
-            contract_id, assessment_id, client_name, contract_text, vendor_description
-        )
-        return
-
-    contract_adapter = ClaudeSDKAdapter(
-        model="claude-haiku-4-5-20251001",
-        custom_section=CONTRACT_AGENT_PROMPT + f"\n\nVENDOR USE CASE:\n{vendor_description}\n\nCONTRACT TEXT:\n{contract_text[:8000]}",
-        features=AdapterFeatures(emit={Emit.EXECUTION}),
-    )
-
-    mcp_config = {}
-    if MIDPAGE_API_KEY:
-        mcp_config = {
-            "midpage": {
-                "type": "http",
-                "url": "https://app.midpage.ai/mcp",
-                "headers": {"Authorization": f"Bearer {MIDPAGE_API_KEY}"},
-            }
-        }
-
-    law_adapter = ClaudeSDKAdapter(
-        model="claude-haiku-4-5-20251001",
-        custom_section=LAW_AGENT_PROMPT + f"\n\nVENDOR USE CASE:\n{vendor_description}",
-        features=AdapterFeatures(emit={Emit.EXECUTION}),
-        **({"mcp_servers": mcp_config, "allowed_tools": ["mcp__midpage__*"]} if mcp_config else {}),
-    )
-
-    contract_agent = Agent.create(
-        adapter=contract_adapter,
-        agent_id=contract_agent_id,
-        api_key=contract_agent_key,
-        ws_url=THENVOI_WS_URL,
-        rest_url=THENVOI_REST_URL,
-    )
-
-    law_agent = Agent.create(
-        adapter=law_adapter,
-        agent_id=law_agent_id,
-        api_key=law_agent_key,
-        ws_url=THENVOI_WS_URL,
-        rest_url=THENVOI_REST_URL,
-    )
-
-    _save_message(conn, room_id, "Orchestrator", "text", "Agents connected. Starting analysis...")
-
-    try:
-        await asyncio.gather(
-            contract_agent.run(),
-            law_agent.run(),
-        )
-    except Exception as e:
-        logger.error(f"Thenvoi agent error for {client_name}: {e}")
-        _save_message(conn, room_id, "Orchestrator", "error", f"Agent error: {e}")
-
-    conn.close()
-
-
 async def _analyze_contract_direct(
     contract_id: str,
     assessment_id: str,
@@ -153,7 +60,7 @@ async def _analyze_contract_direct(
     contract_text: str,
     vendor_description: str,
 ) -> None:
-    """Fallback: analyze a contract using Claude Agent SDK directly (no Thenvoi)."""
+    """Analyze a contract using Claude Agent SDK with subagents."""
     from claude_agent_sdk import (
         query,
         ClaudeAgentOptions,
@@ -174,63 +81,124 @@ async def _analyze_contract_direct(
     conn.commit()
 
     _save_message(conn, room_id, "Orchestrator", "text",
-                  f"Starting direct analysis for client: {client_name}")
+                  f"Starting analysis for client: {client_name}")
 
+    # Subagent definitions — lightweight prompts, NO contract text embedded.
+    # The moderator passes relevant context when it invokes them.
     contract_agent = AgentDefinition(
-        description="ContractAgent analyzes contract clauses for vendor compliance risks.",
+        description=(
+            "ContractAgent: a contract analyst. Give it contract text and a vendor "
+            "description, and it extracts restrictive clauses (data sharing, subprocessor, "
+            "consent, data residency, exclusivity, confidentiality, liability, IP). "
+            "It returns a structured list of clauses with risk ratings."
+        ),
         prompt=(
-            CONTRACT_AGENT_PROMPT
-            + f"\n\nVENDOR USE CASE:\n{vendor_description}"
-            + f"\n\nCONTRACT TEXT (client: {client_name}):\n{contract_text[:8000]}"
+            "You are ContractAgent, a meticulous contract analyst.\n"
+            "When given contract text and a vendor use case, extract ALL restrictive clauses.\n"
+            "For each clause output: clause_type, section_ref, clause_text (exact quote), risk_level (high/medium/low).\n"
+            "Be thorough. Keep your response concise — just the clause list.\n"
+            "Sign as ContractAgent."
         ),
         tools=[],
         model="haiku",
     )
 
     law_agent = AgentDefinition(
-        description="LawAgent researches legal implications of contract clauses.",
-        prompt=LAW_AGENT_PROMPT + f"\n\nVENDOR USE CASE:\n{vendor_description}",
+        description=(
+            "LawAgent: a legal researcher. Give it a list of contract clauses and a vendor "
+            "use case, and it identifies applicable laws, regulations, and case precedents. "
+            "It returns legal analysis per clause with citations."
+        ),
+        prompt=(
+            "You are LawAgent, a legal researcher specializing in US contract law.\n"
+            "When given contract clauses, identify relevant laws, regulations, and case precedents.\n"
+            "For each clause assess: is it enforceable? what regulations apply? what's the legal risk for the vendor use case?\n"
+            "Cite laws in standard format (e.g., GDPR Art. 28, CCPA §1798.140, HIPAA §164.502).\n"
+            "Keep your response concise. Sign as LawAgent."
+        ),
         tools=[],
         model="haiku",
     )
 
-    mcp_config = {}
-    if MIDPAGE_API_KEY:
-        mcp_config = {
-            "midpage": {
-                "type": "http",
-                "url": "https://app.midpage.ai/mcp",
-                "headers": {"Authorization": f"Bearer {MIDPAGE_API_KEY}"},
-            }
-        }
+    truncated_text = contract_text[:MAX_CONTRACT_CHARS]
 
-    moderator_prompt = f"""You are the Orchestrator coordinating a contract compliance analysis.
+    moderator_prompt = f"""You are orchestrating a contract compliance analysis using two specialist agents.
 
 CLIENT: {client_name}
-VENDOR USE CASE: {vendor_description}
+VENDOR: {vendor_description}
 
-CONTRACT TEXT (first 8000 chars):
-{contract_text[:8000]}
+CONTRACT TEXT:
+---
+{truncated_text}
+---
 
-YOUR JOB:
-1. First, invoke the "contract_agent" to extract relevant clauses from the contract
-2. Then, invoke the "law_agent" to research legal implications of those clauses
-3. Then, invoke "contract_agent" again with the legal findings to produce the final assessment
-4. Summarize the final structured JSON result
+WORKFLOW — follow these steps exactly:
 
-IMPORTANT:
-- You MUST use the Agent tool to invoke agents
-- Pass relevant context between agents
-- The final output MUST include a JSON block with the ContractResult schema
-"""
+STEP 1: Invoke "contract_agent" with this prompt:
+  "Analyze this contract for {client_name}. Extract all restrictive clauses relevant to onboarding a new vendor: {vendor_description}
 
+  CONTRACT TEXT:
+  {truncated_text[:3000]}..."
+
+  (Pass enough contract text for it to work with.)
+
+STEP 2: Take the clauses from ContractAgent's response. Invoke "law_agent" with this prompt:
+  "Research legal implications of these contract clauses for onboarding vendor: {vendor_description}
+
+  CLAUSES FOUND:
+  [paste ContractAgent's clause list here]"
+
+STEP 3: Synthesize both agents' findings. Produce a FINAL JSON result in a ```json code block:
+
+```json
+{{
+  "client_name": "{client_name}",
+  "overall_risk": "high" or "medium" or "low",
+  "recommendation": "eligible" or "ineligible" or "needs_amendment",
+  "clauses": [
+    {{
+      "clause_type": "data_sharing",
+      "section_ref": "Section 3.1",
+      "clause_text": "exact text from contract",
+      "risk_level": "high",
+      "violations": [
+        {{
+          "severity": "critical" or "major" or "minor",
+          "explanation": "plain language explanation",
+          "legal_ref": {{
+            "citation": "GDPR Art. 28",
+            "case_name": "Relevant case or regulation",
+            "court_name": "Court or regulatory body",
+            "relevance": "why this applies"
+          }},
+          "original_language": "current clause text",
+          "proposed_amendment": "suggested new language",
+          "legal_justification": "why this fixes the issue"
+        }}
+      ]
+    }}
+  ]
+}}
+```
+
+CRITICAL RULES:
+- You MUST use the Agent tool to invoke "contract_agent" and "law_agent"
+- You MUST end with a ```json code block containing the final result
+- Include at least 2-3 clauses with detailed violations
+- The JSON must be valid and complete"""
+
+    # No MCP servers on the moderator — keeps the CLI invocation simple and fast.
+    # Subagents also have no MCP tools — they reason from their training data.
     options = ClaudeAgentOptions(
         model="haiku",
-        system_prompt="You are a contract compliance orchestrator. Use agents to analyze contracts.",
-        allowed_tools=["Agent"] + (["mcp__midpage__*"] if mcp_config else []),
+        system_prompt=(
+            "You are a contract compliance orchestrator. "
+            "Use the Agent tool to invoke contract_agent and law_agent subagents. "
+            "Follow the workflow steps exactly. End with a JSON result."
+        ),
+        allowed_tools=["Agent"],
         agents={"contract_agent": contract_agent, "law_agent": law_agent},
         permission_mode="bypassPermissions",
-        **({"mcp_servers": mcp_config} if mcp_config else {}),
     )
 
     final_text = ""
@@ -245,10 +213,11 @@ IMPORTANT:
             if isinstance(message, ResultMessage):
                 if message.subtype == "success" and message.result:
                     final_text += str(message.result)
+                cost = getattr(message, "total_cost_usd", 0) or 0
                 _save_message(conn, room_id, "Orchestrator", "text",
-                              f"Analysis complete. Cost: ${message.total_cost_usd:.4f}")
+                              f"Analysis complete. Cost: ${cost:.4f}")
     except Exception as e:
-        logger.error(f"Direct analysis error for {client_name}: {e}")
+        logger.error(f"Agent error for {client_name}: {e}")
         _save_message(conn, room_id, "Orchestrator", "error", str(e))
         conn.execute("UPDATE contracts SET status = 'failed' WHERE id = ?", (contract_id,))
         conn.commit()
@@ -349,7 +318,10 @@ async def run_assessment(assessment_id: str) -> None:
         for row in contracts_with_text
     ]
 
-    await asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            logger.error(f"  Contract {contracts_with_text[i]['client_name']} raised: {result}")
 
     # Compute summary
     conn3 = get_connection()
