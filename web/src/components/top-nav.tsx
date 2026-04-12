@@ -9,7 +9,7 @@ export function TopNav() {
   const isAssessment = pathname.startsWith("/assessment");
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-border bg-background/80 backdrop-blur-md">
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-border bg-background/80 backdrop-blur-md shadow-sm">
       <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2.5">
           <Shield className="h-5 w-5 text-gold" />

@@ -23,11 +23,22 @@ export async function GET(
       eligibleCount: assessment.eligibleCount,
       totalCount: assessment.totalCount,
     },
+    valueAtRisk: {
+      totalValue: clients.reduce((sum, c) => sum + (c.contractValue ?? 0), 0),
+      totalAtRisk: clients.reduce((sum, c) => {
+        if (c.contractValue == null) return sum;
+        const weight =
+          c.riskScore === "high" ? 1.0 : c.riskScore === "medium" ? 0.5 : 0.1;
+        return sum + c.contractValue * weight;
+      }, 0),
+    },
     clients: clients.map((client) => ({
       clientName: client.clientName,
       fileName: client.fileName,
       riskScore: client.riskScore,
       recommendation: client.recommendation,
+      contractValue: client.contractValue,
+      feeDescription: client.feeDescription,
       clauses: client.clauses.map((clause) => ({
         type: clause.clauseType,
         section: clause.sectionRef,

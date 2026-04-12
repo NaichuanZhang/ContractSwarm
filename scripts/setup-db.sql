@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS contracts (
     raw_text        TEXT,
     risk_score      TEXT,
     recommendation  TEXT,
+    contract_value  REAL,
+    fee_description TEXT,
     status          TEXT NOT NULL DEFAULT 'pending',
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );

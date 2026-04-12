@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
 export const assessments = sqliteTable("assessments", {
   id: text("id").primaryKey(),
@@ -22,6 +22,8 @@ export const contracts = sqliteTable("contracts", {
   rawText: text("raw_text"),
   riskScore: text("risk_score"),
   recommendation: text("recommendation"),
+  contractValue: real("contract_value"),
+  feeDescription: text("fee_description"),
   status: text("status").notNull().default("pending"),
   createdAt: text("created_at").notNull(),
 });

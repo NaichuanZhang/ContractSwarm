@@ -1,14 +1,14 @@
 export const COLORS = {
-  background: "#0A0A0A",
-  card: "#141414",
-  surface: "#1C1C1C",
-  textPrimary: "#F5F0EB",
-  textMuted: "#8A8580",
-  gold: "#C8A97E",
-  border: "#2A2724",
-  riskHigh: "#E85D4A",
-  riskMedium: "#D4A843",
-  riskLow: "#4A9E6E",
+  background: "#FAFAF8",
+  card: "#FFFFFF",
+  surface: "#F0EDE8",
+  textPrimary: "#1A1A1A",
+  textMuted: "#6B6560",
+  gold: "#8B6F47",
+  border: "#E5E0DB",
+  riskHigh: "#DC3A2A",
+  riskMedium: "#B8922E",
+  riskLow: "#2D7A4A",
 } as const;
 
 export const CLAUSE_TYPE_LABELS: Record<string, string> = {

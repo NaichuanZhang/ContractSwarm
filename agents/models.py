@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class OrchestrateRequest(BaseModel):
@@ -45,7 +45,24 @@ class ContractResult(BaseModel):
     client_name: str
     overall_risk: str
     recommendation: str
+    contract_value: float | None = None
+    fee_description: str | None = None
     clauses: list[ClauseData] = []
+
+    @field_validator("contract_value", mode="before")
+    @classmethod
+    def parse_contract_value(cls, v: object) -> float | None:
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            cleaned = v.replace("$", "").replace(",", "").strip()
+            try:
+                return float(cleaned)
+            except ValueError:
+                return None
+        return None
 
 
 # Forward reference resolution

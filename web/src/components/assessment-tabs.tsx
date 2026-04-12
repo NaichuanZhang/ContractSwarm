@@ -19,7 +19,7 @@ export function AssessmentTabs({ assessmentId }: AssessmentTabsProps) {
   const pathname = usePathname();
 
   return (
-    <div className="sticky top-14 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+    <div className="sticky top-14 z-40 border-b border-border bg-background/80 backdrop-blur-md shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center gap-1 px-6">
         {tabs.map((tab) => {
           const href = `/assessment/${assessmentId}/${tab.href}`;

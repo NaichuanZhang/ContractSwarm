@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Download, FileCheck } from "lucide-react";
+import { DollarSign, Download, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -47,6 +47,8 @@ interface ClientReport {
   fileName: string;
   riskScore: string | null;
   recommendation: string | null;
+  contractValue: number | null;
+  feeDescription: string | null;
   clauses: Clause[];
 }
 
@@ -54,6 +56,19 @@ interface ReportData {
   assessment: Record<string, unknown>;
   clients: ClientReport[];
 }
+
+const RISK_WEIGHTS: Record<string, number> = {
+  high: 1.0,
+  medium: 0.5,
+  low: 0.1,
+};
+
+const formatUSD = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
 
 export default function ReportPage({
   params,
@@ -97,6 +112,19 @@ export default function ReportPage({
   const eligibleCount = assessment?.eligibleCount ?? 0;
   const totalCount = assessment?.totalCount ?? 0;
 
+  const totalContractValue = (report?.clients ?? []).reduce(
+    (sum, c) => sum + (c.contractValue ?? 0),
+    0
+  );
+  const valueAtRisk = (report?.clients ?? []).reduce((sum, c) => {
+    if (c.contractValue == null) return sum;
+    const weight = RISK_WEIGHTS[c.riskScore ?? "low"] ?? 0.1;
+    return sum + c.contractValue * weight;
+  }, 0);
+  const hasContractValues = (report?.clients ?? []).some(
+    (c) => c.contractValue != null && c.contractValue > 0
+  );
+
   return (
     <div>
       {/* Summary Header */}
@@ -104,51 +132,50 @@ export default function ReportPage({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="mb-8"
+        className="mb-10"
       >
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="font-heading text-2xl font-semibold tracking-tight">
+            <h2 className="font-heading text-4xl font-semibold tracking-tight">
               Compliance Report
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-2 text-base text-muted-foreground">
               Vendor assessment for{" "}
-              <span className="text-foreground">
+              <span className="text-foreground font-medium">
                 {assessment?.vendorName ?? "—"}
               </span>
             </p>
           </div>
           <Button
             variant="outline"
-            size="sm"
             onClick={handleExport}
             className="border-border text-muted-foreground hover:text-foreground"
           >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
+            <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
         </div>
 
         {/* Stats bar */}
-        <div className="mt-6 flex items-center gap-6 rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center gap-2">
-            <FileCheck className="h-4 w-4 text-gold" />
+        <div className="mt-8 flex items-center gap-8 rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <FileCheck className="h-5 w-5 text-gold" />
             <div>
-              <p className="text-2xl font-heading font-semibold">
+              <p className="text-4xl font-heading font-semibold">
                 {eligibleCount}
-                <span className="text-muted-foreground text-lg">
+                <span className="text-muted-foreground text-xl">
                   /{totalCount}
                 </span>
               </p>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
                 Clients Eligible
               </p>
             </div>
           </div>
           {report?.clients && report.clients.length > 0 && (
             <>
-              <div className="h-10 w-px bg-border" />
-              <div className="flex flex-1 items-center gap-1.5">
+              <div className="h-12 w-px bg-border" />
+              <div className="flex flex-1 items-center gap-2">
                 {report.clients.map((client) => {
                   const risk = client.riskScore;
                   const color =
@@ -160,21 +187,21 @@ export default function ReportPage({
                   return (
                     <div
                       key={client.id}
-                      className={`h-3 flex-1 rounded-full ${color}`}
+                      className={`h-4 flex-1 rounded-full ${color}`}
                       title={`${client.clientName}: ${risk ?? "unknown"} risk`}
                     />
                   );
                 })}
               </div>
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-risk-high" /> High
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-risk-high" /> High
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-risk-medium" /> Medium
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-risk-medium" /> Medium
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-risk-low" /> Low
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-risk-low" /> Low
                 </span>
               </div>
             </>
@@ -182,13 +209,66 @@ export default function ReportPage({
         </div>
       </motion.div>
 
+      {/* Contract Value at Risk */}
+      {hasContractValues && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="mb-10"
+        >
+          <div className="flex items-center gap-8 rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <DollarSign className="h-5 w-5 text-gold" />
+              <div>
+                <p className="text-3xl font-heading font-semibold">
+                  {formatUSD(totalContractValue)}
+                </p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+                  Total Contract Value
+                </p>
+              </div>
+            </div>
+            <div className="h-12 w-px bg-border" />
+            <div>
+              <p className="text-3xl font-heading font-semibold text-risk-high">
+                {formatUSD(valueAtRisk)}
+              </p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+                Value at Risk
+              </p>
+            </div>
+            <div className="h-12 w-px bg-border" />
+            <div className="flex flex-1 flex-col gap-1.5">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Risk-weighted exposure</span>
+                <span className="ml-auto font-medium">
+                  {totalContractValue > 0
+                    ? Math.round((valueAtRisk / totalContractValue) * 100)
+                    : 0}
+                  %
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-surface">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-risk-low via-risk-medium to-risk-high"
+                  style={{
+                    width: `${totalContractValue > 0 ? Math.round((valueAtRisk / totalContractValue) * 100) : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Report accordion */}
       {!report?.clients?.length ? (
-        <div className="flex h-48 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground">
+        <div className="flex h-48 items-center justify-center rounded-xl border border-border bg-card text-base text-muted-foreground shadow-sm">
           No report data yet. Wait for the swarm to complete analysis.
         </div>
       ) : (
-        <Accordion defaultValue={[report.clients[0]?.id ?? ""]}>
+        <div className="space-y-4">
           {report.clients.map((client) => {
             const allViolations = client.clauses.flatMap((clause) =>
               clause.violations.map((v) => ({
@@ -197,50 +277,106 @@ export default function ReportPage({
               }))
             );
 
+            const riskLevel = client.riskScore ?? "low";
+            const borderColor =
+              riskLevel === "high"
+                ? "border-l-risk-high"
+                : riskLevel === "medium"
+                  ? "border-l-risk-medium"
+                  : "border-l-risk-low";
+
             return (
-              <AccordionItem
-                key={client.id}
-                value={client.id}
-                className="border-border"
-              >
-                <AccordionTrigger className="py-4 hover:no-underline">
-                  <div className="flex items-center gap-3 text-left">
-                    <span className="text-sm font-medium">
-                      {client.clientName}
-                    </span>
-                    {client.riskScore && (
-                      <RiskBadge level={client.riskScore as RiskLevel} />
-                    )}
-                    {client.recommendation && (
-                      <RecommendationBadge
-                        recommendation={client.recommendation as Recommendation}
-                      />
-                    )}
-                    {allViolations.length > 0 && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {allViolations.length} violation
-                        {allViolations.length !== 1 ? "s" : ""}
+              <Accordion key={client.id} defaultValue={[client.id]}>
+                <AccordionItem
+                  value={client.id}
+                  className={`border border-border rounded-xl bg-card shadow-sm border-l-4 ${borderColor} overflow-hidden`}
+                >
+                  <AccordionTrigger className="px-6 py-5 hover:no-underline">
+                    <div className="flex items-center gap-4 text-left">
+                      <span className="text-lg font-semibold">
+                        {client.clientName}
                       </span>
-                    )}
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 pb-2">
-                    {allViolations.length === 0 && (
-                      <p className="text-sm text-muted-foreground py-2">
-                        No violations found. Contract terms are compatible with vendor
-                        engagement.
-                      </p>
-                    )}
-                    {allViolations.map((violation) => (
-                      <ViolationCard key={violation.id} violation={violation} />
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
+                      {client.riskScore && (
+                        <RiskBadge level={client.riskScore as RiskLevel} />
+                      )}
+                      {client.recommendation && (
+                        <RecommendationBadge
+                          recommendation={client.recommendation as Recommendation}
+                        />
+                      )}
+                      {allViolations.length > 0 && (
+                        <span className="text-sm text-muted-foreground">
+                          {allViolations.length} violation
+                          {allViolations.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {client.contractValue != null && client.contractValue > 0 && (
+                        <span className="ml-auto text-sm font-medium text-gold">
+                          {formatUSD(client.contractValue)}
+                        </span>
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="px-6 pb-5 space-y-4">
+                      {client.feeDescription && (
+                        <p className="text-sm italic text-muted-foreground">
+                          {client.feeDescription}
+                        </p>
+                      )}
+                      {allViolations.length === 0 ? (
+                        <div className="rounded-lg bg-risk-low/8 border border-risk-low/20 p-4">
+                          <p className="text-base text-risk-low font-medium">
+                            No violations found. Contract terms are compatible with
+                            vendor engagement.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Summary callout */}
+                          <div className="rounded-lg bg-surface p-4 flex items-center gap-6">
+                            <div className="text-sm text-muted-foreground">
+                              <span className="text-2xl font-heading font-semibold text-foreground">
+                                {allViolations.length}
+                              </span>{" "}
+                              violation{allViolations.length !== 1 ? "s" : ""} found
+                            </div>
+                            <div className="h-8 w-px bg-border" />
+                            <div className="flex items-center gap-3 text-sm">
+                              {["critical", "major", "minor"].map((sev) => {
+                                const count = allViolations.filter(
+                                  (v) => v.severity === sev
+                                ).length;
+                                if (count === 0) return null;
+                                const sevColor =
+                                  sev === "critical"
+                                    ? "text-risk-high"
+                                    : sev === "major"
+                                      ? "text-risk-medium"
+                                      : "text-risk-low";
+                                return (
+                                  <span key={sev} className={`${sevColor} font-medium`}>
+                                    {count} {sev}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {allViolations.map((violation) => (
+                            <ViolationCard
+                              key={violation.id}
+                              violation={violation}
+                            />
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             );
           })}
-        </Accordion>
+        </div>
       )}
     </div>
   );

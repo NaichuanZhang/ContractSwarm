@@ -68,8 +68,8 @@ def persist_result(
 
     # Update contract with results
     conn.execute(
-        "UPDATE contracts SET risk_score = ?, recommendation = ?, status = 'completed' WHERE id = ?",
-        (result.overall_risk, result.recommendation, contract_id),
+        "UPDATE contracts SET risk_score = ?, recommendation = ?, contract_value = ?, fee_description = ?, status = 'completed' WHERE id = ?",
+        (result.overall_risk, result.recommendation, result.contract_value, result.fee_description, contract_id),
     )
 
     for clause in result.clauses:

@@ -41,8 +41,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           className={cn(
             "rounded-lg px-3 py-2 text-[13px] leading-relaxed",
             isContractAgent
-              ? "bg-[#1A1815] text-foreground/90"
-              : "bg-[#141820] text-foreground/90"
+              ? "bg-secondary text-foreground/90"
+              : "bg-secondary text-foreground/90"
           )}
         >
           {message.content}
@@ -59,7 +59,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       )}
 
       {message.message_type === "tool_call" && (
-        <div className="rounded-lg bg-[#0D0D0D] border border-border/50 px-3 py-2">
+        <div className="rounded-lg bg-muted border border-border/50 px-3 py-2">
           <div className="flex items-center gap-1.5 mb-1">
             <Terminal className="h-3 w-3 text-gold/60" />
             <span className="text-[10px] font-medium uppercase tracking-wider text-gold/60">
@@ -73,7 +73,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       )}
 
       {message.message_type === "tool_result" && (
-        <div className="rounded-lg border-l-2 border-gold/40 bg-[#0D0D0D] px-3 py-2">
+        <div className="rounded-lg border-l-2 border-gold/40 bg-muted px-3 py-2">
           <div className="flex items-center gap-1.5 mb-1">
             <ArrowRight className="h-3 w-3 text-gold/40" />
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">

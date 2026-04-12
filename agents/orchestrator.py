@@ -89,14 +89,19 @@ async def _analyze_contract_direct(
         description=(
             "ContractAgent: a contract analyst. Give it contract text and a vendor "
             "description, and it extracts restrictive clauses (data sharing, subprocessor, "
-            "consent, data residency, exclusivity, confidentiality, liability, IP). "
-            "It returns a structured list of clauses with risk ratings."
+            "consent, data residency, exclusivity, confidentiality, liability, IP) "
+            "and the contract's monetary value/fees. "
+            "It returns a structured list of clauses with risk ratings, plus financial data."
         ),
         prompt=(
             "You are ContractAgent, a meticulous contract analyst.\n"
             "When given contract text and a vendor use case, extract ALL restrictive clauses.\n"
             "For each clause output: clause_type, section_ref, clause_text (exact quote), risk_level (high/medium/low).\n"
-            "Be thorough. Keep your response concise — just the clause list.\n"
+            "Also extract the total contract value as a numeric USD amount (contract_value) "
+            "and a brief summary of payment terms (fee_description). "
+            "Look for: annual fees, retainer amounts, total contract value, per-unit pricing, or any monetary figures.\n"
+            "If no monetary information is found, set both to null.\n"
+            "Be thorough. Keep your response concise.\n"
             "Sign as ContractAgent."
         ),
         tools=[],
@@ -137,6 +142,7 @@ WORKFLOW — follow these steps exactly:
 
 STEP 1: Invoke "contract_agent" with this prompt:
   "Analyze this contract for {client_name}. Extract all restrictive clauses relevant to onboarding a new vendor: {vendor_description}
+  Also extract the total contract value (as a numeric USD amount) and a brief fee description from any fee/payment sections.
 
   CONTRACT TEXT:
   {truncated_text[:3000]}..."
@@ -156,6 +162,8 @@ STEP 3: Synthesize both agents' findings. Produce a FINAL JSON result in a ```js
   "client_name": "{client_name}",
   "overall_risk": "high" or "medium" or "low",
   "recommendation": "eligible" or "ineligible" or "needs_amendment",
+  "contract_value": 150000.00 or null,
+  "fee_description": "brief description of fees/payment terms" or null,
   "clauses": [
     {{
       "clause_type": "data_sharing",

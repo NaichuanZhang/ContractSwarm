@@ -75,7 +75,7 @@ function LawNodeComponent({ data, selected }: CustomNodeProps) {
   return (
     <div
       className={cn(
-        "rounded-md border border-border bg-[#12120F] px-3 py-2 shadow-md transition-all",
+        "rounded-md border border-border bg-card px-3 py-2 shadow-md transition-all",
         selected && "ring-1 ring-gold/50"
       )}
     >

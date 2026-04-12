@@ -77,7 +77,7 @@ function layoutNodes(
 
   const edges: Edge[] = rawEdges.map((e) => {
     const severity = (e.data?.severity as string) ?? null;
-    const color = severity ? SEVERITY_COLORS[severity] ?? "#2A2724" : "#2A2724";
+    const color = severity ? SEVERITY_COLORS[severity] ?? "#C5C0BB" : "#C5C0BB";
     return {
       ...e,
       style: { stroke: color, strokeWidth: severity ? 2 : 1 },
@@ -154,7 +154,7 @@ export default function GraphPage({
             minZoom={0.3}
             maxZoom={1.5}
           >
-            <Background gap={24} size={1} color="#1C1C1C" />
+            <Background gap={24} size={1} color="#E5E0DB" />
             <Controls
               showInteractive={false}
               className="!bg-card !border-border !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-surface"
