@@ -105,15 +105,16 @@ async def _analyze_contract_direct(
 
     law_agent = AgentDefinition(
         description=(
-            "LawAgent: a legal researcher. Give it a list of contract clauses and a vendor "
-            "use case, and it identifies applicable laws, regulations, and case precedents. "
-            "It returns legal analysis per clause with citations."
+            "LawAgent: a US legal researcher. Give it a list of contract clauses and a vendor "
+            "use case, and it identifies applicable US federal and state laws, regulations, "
+            "and case precedents. It returns legal analysis per clause with US citations."
         ),
         prompt=(
-            "You are LawAgent, a legal researcher specializing in US contract law.\n"
-            "When given contract clauses, identify relevant laws, regulations, and case precedents.\n"
-            "For each clause assess: is it enforceable? what regulations apply? what's the legal risk for the vendor use case?\n"
-            "Cite laws in standard format (e.g., GDPR Art. 28, CCPA §1798.140, HIPAA §164.502).\n"
+            "You are LawAgent, a legal researcher specializing in US federal and state law.\n"
+            "When given contract clauses, identify relevant US laws, regulations, and case precedents.\n"
+            "For each clause assess: is it enforceable under US law? what US regulations apply? what's the legal risk?\n"
+            "ONLY cite US law (e.g., CCPA §1798.140, HIPAA §164.502, FTC Act §5, state privacy acts, UCC).\n"
+            "Do NOT cite GDPR, EU directives, or any non-US law.\n"
             "Keep your response concise. Sign as LawAgent."
         ),
         tools=[],
@@ -166,9 +167,9 @@ STEP 3: Synthesize both agents' findings. Produce a FINAL JSON result in a ```js
           "severity": "critical" or "major" or "minor",
           "explanation": "plain language explanation",
           "legal_ref": {{
-            "citation": "GDPR Art. 28",
-            "case_name": "Relevant case or regulation",
-            "court_name": "Court or regulatory body",
+            "citation": "CCPA §1798.140",
+            "case_name": "Relevant US case or regulation",
+            "court_name": "US Court or federal/state regulatory body",
             "relevance": "why this applies"
           }},
           "original_language": "current clause text",
@@ -185,6 +186,8 @@ CRITICAL RULES:
 - You MUST use the Agent tool to invoke "contract_agent" and "law_agent"
 - You MUST end with a ```json code block containing the final result
 - Include at least 2-3 clauses with detailed violations
+- ONLY cite US federal and state laws (CCPA, HIPAA, FTC Act, state privacy laws, UCC, etc.)
+- Do NOT cite GDPR, EU directives, or any non-US law
 - The JSON must be valid and complete"""
 
     # No MCP servers on the moderator — keeps the CLI invocation simple and fast.
