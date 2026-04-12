@@ -1,21 +1,30 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import { Playfair_Display, DM_Sans, JetBrains_Mono } from "next/font/google";
+import { TopNav } from "@/components/top-nav";
 import { Providers } from "@/components/providers";
+import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const playfair = Playfair_Display({
+  variable: "--font-playfair-display",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "ContractSwarm",
-  description: "AI agents swarm your contracts so you don't have to.",
+  title: "ContractSwarm — AI Compliance Analysis",
+  description: "AI-powered contract compliance analysis using agent swarms",
 };
 
 export default function RootLayout({
@@ -24,12 +33,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
-    >
-      <body className="min-h-full bg-background text-foreground">
-        <Providers>{children}</Providers>
+    <html lang="en" className="dark">
+      <body
+        className={`${playfair.variable} ${dmSans.variable} ${jetbrainsMono.variable} antialiased`}
+      >
+        <Providers>
+          <TopNav />
+          <main className="pt-14">{children}</main>
+        </Providers>
       </body>
     </html>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { NavSidebar } from "@/components/nav-sidebar";
+import { AssessmentTabs } from "@/components/assessment-tabs";
 
 export default function AssessmentLayout({
   children,
@@ -13,9 +13,9 @@ export default function AssessmentLayout({
   const { id } = use(params);
 
   return (
-    <div className="flex h-screen">
-      <NavSidebar assessmentId={id} />
-      <main className="flex-1 overflow-auto">{children}</main>
+    <div>
+      <AssessmentTabs assessmentId={id} />
+      <div className="mx-auto max-w-7xl px-6 py-8">{children}</div>
     </div>
   );
 }
