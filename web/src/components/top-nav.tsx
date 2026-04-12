@@ -7,6 +7,9 @@ import { Shield } from "lucide-react";
 export function TopNav() {
   const pathname = usePathname();
   const isAssessment = pathname.startsWith("/assessment");
+  const isLanding = pathname === "/landing";
+
+  if (isLanding) return null;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-border bg-background/80 backdrop-blur-md shadow-sm">

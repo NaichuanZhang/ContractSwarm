@@ -22,8 +22,10 @@ export default function HomePage() {
   const [files, setFiles] = useState<ContractFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [vendorName, setVendorName] = useState("");
-  const [vendorDescription, setVendorDescription] = useState("");
+  const [vendorName, setVendorName] = useState("TestVendor");
+  const [vendorDescription, setVendorDescription] = useState(
+    "This vendor automates control testing for SOX and SOC by evaluating client provided data against testing attributes for each control and provides evaluation conclusion to generate the final SOX or SOC report. We will be using this tool to increase efficiency during service delivery to our SOX or SOC clients"
+  );
 
   useEffect(() => {
     fetch("/api/contracts")

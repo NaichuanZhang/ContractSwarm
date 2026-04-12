@@ -13,7 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useAssessment } from "@/hooks/use-assessment";
-import { ClientNode, ClauseNode, LawNode } from "@/components/graph-nodes";
+import { ClientNode, ClauseNode, CategoryNode, LawNode } from "@/components/graph-nodes";
 import { GraphSidebar } from "@/components/graph-sidebar";
 
 const RISK_COLORS: Record<string, string> = {
@@ -31,6 +31,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 const nodeTypes: NodeTypes = {
   client: ClientNode,
   clause: ClauseNode,
+  category: CategoryNode,
   law: LawNode,
 };
 
@@ -40,18 +41,19 @@ function layoutNodes(
 ): { nodes: Node[]; edges: Edge[] } {
   const clients = rawNodes.filter((n) => n.type === "client");
   const clauseNodes = rawNodes.filter((n) => n.type === "clause");
+  const categories = rawNodes.filter((n) => n.type === "category");
   const laws = rawNodes.filter((n) => n.type === "law");
 
   const nodes: Node[] = [];
   const ySpacing = 140;
-  const xColumns = [0, 380, 780];
+  const xColumns = [0, 350, 700, 1080];
 
   // Clients on left column
   clients.forEach((n, i) => {
     nodes.push({ ...n, position: { x: xColumns[0], y: i * ySpacing } });
   });
 
-  // Clauses in middle column — positioned near their parent client
+  // Clauses in second column — positioned near their parent client
   clauseNodes.forEach((n, i) => {
     const parentEdge = rawEdges.find((e) => e.target === n.id);
     const parentNode = parentEdge
@@ -70,9 +72,28 @@ function layoutNodes(
     });
   });
 
-  // Laws on right column
-  laws.forEach((n, i) => {
+  // Category nodes in third column
+  categories.forEach((n, i) => {
     nodes.push({ ...n, position: { x: xColumns[2], y: i * ySpacing } });
+  });
+
+  // Laws on right column — group under their category
+  laws.forEach((n, i) => {
+    const parentEdge = rawEdges.find((e) => e.target === n.id);
+    const parentNode = parentEdge
+      ? nodes.find((nd) => nd.id === parentEdge.source)
+      : null;
+    const siblings = laws.filter((l) => {
+      const pe = rawEdges.find((e) => e.target === l.id);
+      return pe?.source === parentEdge?.source;
+    });
+    const siblingIndex = siblings.indexOf(n);
+    const baseY = parentNode ? parentNode.position.y : i * 100;
+
+    nodes.push({
+      ...n,
+      position: { x: xColumns[3], y: baseY + siblingIndex * 80 },
+    });
   });
 
   const edges: Edge[] = rawEdges.map((e) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Building2, ScrollText, Scale } from "lucide-react";
+import { X, Building2, ScrollText, Scale, Landmark } from "lucide-react";
 import type { Node } from "@xyflow/react";
 import { CLAUSE_TYPE_LABELS } from "@/lib/constants";
 
@@ -78,6 +78,20 @@ export function GraphSidebar({ node, onClose }: GraphSidebarProps) {
                     </p>
                   </div>
                 )}
+              </>
+            )}
+
+            {node.type === "category" && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-gold" />
+                  <span className="text-sm font-medium">{node.data.label as string}</span>
+                </div>
+                <div className="rounded-md bg-gold/5 border border-gold/20 p-3">
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    Legal category grouping citations under {node.data.label as string} regulatory framework.
+                  </p>
+                </div>
               </>
             )}
 

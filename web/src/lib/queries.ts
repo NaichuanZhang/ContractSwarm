@@ -72,6 +72,17 @@ export function getMessagesForAssessment(assessmentId: string, since?: string) {
   }>;
 }
 
+function categorizeRef(citation: string, caseName: string): string {
+  const text = (citation + " " + caseName).toUpperCase();
+  if (text.includes("HIPAA") || text.includes("45 CFR 164") || text.includes("164.5")) return "HIPAA";
+  if (text.includes("CCPA") || text.includes("1798.") || text.includes("CALIFORNIA CONSUMER PRIVACY")) return "CCPA";
+  if (text.includes("SOX") || text.includes("SARBANES") || text.includes("PCAOB") || text.includes("AICPA") || text.includes("AT-C")) return "SOX";
+  if (text.includes("FTC") || text.includes("15 U.S.C")) return "FTC";
+  if (text.includes("GLBA") || text.includes("GRAMM")) return "GLBA";
+  if (text.includes("UCC") || text.includes("UNIFORM COMMERCIAL")) return "UCC";
+  return "Other";
+}
+
 export function getGraphData(assessmentId: string) {
   const contractRows = db
     .select()
@@ -86,6 +97,8 @@ export function getGraphData(assessmentId: string) {
     target: string;
     data?: Record<string, unknown>;
   }> = [];
+
+  const categoryNodeIds = new Set<string>();
 
   for (const contract of contractRows) {
     const clientNodeId = `client-${contract.id}`;
@@ -136,6 +149,21 @@ export function getGraphData(assessmentId: string) {
 
       for (const { violation, legalRef } of violationRows) {
         if (legalRef) {
+          const category = categorizeRef(legalRef.citation, legalRef.caseName);
+          const categoryNodeId = `category-${category}`;
+
+          if (!categoryNodeIds.has(categoryNodeId)) {
+            categoryNodeIds.add(categoryNodeId);
+            nodes.push({
+              id: categoryNodeId,
+              type: "category",
+              data: {
+                label: category,
+                category,
+              },
+            });
+          }
+
           const lawNodeId = `law-${legalRef.id}`;
           if (!nodes.find((n) => n.id === lawNodeId)) {
             nodes.push({
@@ -145,15 +173,25 @@ export function getGraphData(assessmentId: string) {
                 label: legalRef.caseName,
                 citation: legalRef.citation,
                 courtName: legalRef.courtName,
+                category,
               },
             });
           }
+
           edges.push({
-            id: `e-${clauseNodeId}-${lawNodeId}-${violation.id}`,
+            id: `e-${clauseNodeId}-${categoryNodeId}-${violation.id}`,
             source: clauseNodeId,
-            target: lawNodeId,
+            target: categoryNodeId,
             data: { severity: violation.severity },
           });
+
+          if (!edges.find((e) => e.id === `e-${categoryNodeId}-${lawNodeId}`)) {
+            edges.push({
+              id: `e-${categoryNodeId}-${lawNodeId}`,
+              source: categoryNodeId,
+              target: lawNodeId,
+            });
+          }
         }
       }
     }

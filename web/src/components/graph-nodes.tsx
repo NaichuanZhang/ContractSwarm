@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
-import { Building2, ScrollText, Scale } from "lucide-react";
+import { Building2, ScrollText, Scale, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CustomNodeProps {
@@ -71,6 +71,25 @@ function ClauseNodeComponent({ data, selected }: CustomNodeProps) {
   );
 }
 
+
+function CategoryNodeComponent({ data, selected }: CustomNodeProps) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border-2 border-gold/40 bg-gold/5 px-4 py-2.5 shadow-md transition-all",
+        selected && "ring-1 ring-gold/50"
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <Landmark className="h-4 w-4 text-gold" />
+        <p className="text-xs font-semibold text-gold">{data.label as string}</p>
+      </div>
+      <Handle type="target" position={Position.Left} className="!bg-gold/50 !w-2 !h-2" />
+      <Handle type="source" position={Position.Right} className="!bg-gold/50 !w-2 !h-2" />
+    </div>
+  );
+}
+
 function LawNodeComponent({ data, selected }: CustomNodeProps) {
   return (
     <div
@@ -95,4 +114,5 @@ function LawNodeComponent({ data, selected }: CustomNodeProps) {
 
 export const ClientNode = memo(ClientNodeComponent);
 export const ClauseNode = memo(ClauseNodeComponent);
+export const CategoryNode = memo(CategoryNodeComponent);
 export const LawNode = memo(LawNodeComponent);

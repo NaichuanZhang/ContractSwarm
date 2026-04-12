@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Download, FileCheck } from "lucide-react";
+import { AlertTriangle, DollarSign, Download, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -124,6 +124,9 @@ export default function ReportPage({
   const hasContractValues = (report?.clients ?? []).some(
     (c) => c.contractValue != null && c.contractValue > 0
   );
+  const contractsAtRisk = (report?.clients ?? []).filter(
+    (c) => c.riskScore === "high" || c.riskScore === "medium"
+  ).length;
 
   return (
     <div>
@@ -169,6 +172,20 @@ export default function ReportPage({
               </p>
               <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
                 Clients Eligible
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-risk-high" />
+            <div>
+              <p className="text-4xl font-heading font-semibold text-risk-high">
+                {contractsAtRisk}
+                <span className="text-muted-foreground text-xl">
+                  /{totalCount}
+                </span>
+              </p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+                Contracts at Risk
               </p>
             </div>
           </div>
@@ -310,11 +327,11 @@ export default function ReportPage({
                           {allViolations.length !== 1 ? "s" : ""}
                         </span>
                       )}
-                      {client.contractValue != null && client.contractValue > 0 && (
-                        <span className="ml-auto text-sm font-medium text-gold">
-                          {formatUSD(client.contractValue)}
-                        </span>
-                      )}
+                      <span className="ml-auto text-sm font-medium text-gold">
+                        {client.contractValue != null && client.contractValue > 0
+                          ? formatUSD(client.contractValue)
+                          : "N/A"}
+                      </span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
