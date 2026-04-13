@@ -422,6 +422,156 @@ Contract text is truncated to 6,000 characters and embedded only in the Moderato
 
 ---
 
+## Midpage Legal Research
+
+ContractSwarm's LawAgent performs real-time US case law research through [Midpage](https://app.midpage.ai), a legal research API that provides semantic search over millions of US court opinions. Midpage is integrated as an **MCP (Model Context Protocol) server** — the agent connects to `https://app.midpage.ai/mcp` via streamable HTTP, giving it direct access to case law search, opinion analysis, and passage extraction tools without any custom HTTP plumbing.
+
+```mermaid
+graph LR
+    subgraph "ContractSwarm Agent Team"
+        MOD[Moderator] -->|"Step 2: Research law"| LA[LawAgent]
+    end
+
+    subgraph "Midpage Platform"
+        MCP["MCP Server\nhttps://app.midpage.ai/mcp"]
+        REST["REST API\nhttps://app.midpage.ai/api/v1"]
+        DB_MP[("US Case Law\nOpinion Database")]
+        MCP --> DB_MP
+        REST --> DB_MP
+    end
+
+    LA -->|"mcp__midpage__search"| MCP
+    LA -->|"mcp__midpage__findInOpinion"| MCP
+    LA -->|"mcp__midpage__analyzeOpinion"| MCP
+
+    MCP -->|"Citations + passages"| LA
+    LA -->|"Legal analysis per clause"| MOD
+
+    MOD -->|"persist_result()"| DB[(SQLite<br/>legal_refs table)]
+
+    style LA fill:#6B5CE7,color:#fff
+    style MOD fill:#8B6F47,color:#fff
+    style MCP fill:#2D7A4A,color:#fff
+    style REST fill:#2D7A4A,color:#fff
+    style DB_MP fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
+    style DB fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
+```
+
+### MCP Tools
+
+Midpage exposes three tools through its MCP server. The LawAgent uses all three during a single contract analysis:
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| **`search`** | Semantic search over US case law | `queries[]` (1–4 parallel queries), `jurisdictionType`, `circuits[]`, `states[]`, `negativeQuery` |
+| **`findInOpinion`** | Extract quotable passages from a specific opinion | `opinionId` or `reporterCitation` or `docket` + `query` |
+| **`analyzeOpinion`** | AI-powered Q&A over an opinion document | Same ID params + `question` |
+
+The LawAgent's typical workflow for a single clause:
+1. **`search`** — find relevant case law for the clause type (e.g., data sharing restrictions under CCPA)
+2. **`findInOpinion`** — extract the specific holding or passage from the most relevant opinion
+3. **`analyzeOpinion`** — ask targeted questions about how the precedent applies to the vendor use case
+
+### MCP Server Configuration
+
+The Midpage MCP server is configured in Claude Agent SDK via `ClaudeAgentOptions`:
+
+```python
+from claude_agent_sdk import ClaudeAgentOptions, query
+
+options = ClaudeAgentOptions(
+    model="claude-haiku-4-5-20251001",
+    mcp_servers={
+        "midpage": {
+            "type": "http",                              # Streamable HTTP transport
+            "url": "https://app.midpage.ai/mcp",         # MCP endpoint
+            "headers": {
+                "Authorization": f"Bearer {MIDPAGE_API_KEY}"
+            },
+        }
+    },
+    allowed_tools=["mcp__midpage__*"],                   # Whitelist all Midpage tools
+    system_prompt="You are a legal research assistant...",
+)
+
+async for message in query(prompt=research_prompt, options=options):
+    # Agent autonomously calls search, findInOpinion, analyzeOpinion
+    ...
+```
+
+The `"type": "http"` transport means the agent connects to Midpage's MCP server over HTTP — no sidecar process, no local installation. The `mcp__midpage__*` wildcard grants access to all three tools while keeping other tool namespaces locked down.
+
+### REST API (Advanced)
+
+For workflows that need direct control beyond what MCP exposes, ContractSwarm also integrates with Midpage's REST API:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/search` | `POST` | Full-text case law search with semantic, keyword, or hybrid modes |
+| `/opinions/get` | `POST` | Retrieve opinion data by ID, Bluebook citation, or docket number |
+| `/court/get` | `POST` | Look up court metadata by ID, abbreviation, or name |
+
+The search endpoint supports advanced filtering — by court (`ca9`, `scotus`), jurisdiction (`Federal Appellate`), state, publish status, and date range — enabling precise queries like "CCPA enforcement actions in California federal courts since 2020."
+
+```python
+# Direct REST call for opinion retrieval with full HTML content
+import httpx
+
+response = httpx.post(
+    "https://app.midpage.ai/api/v1/opinions/get",
+    json={
+        "citations": ["799 F.3d 236"],         # Bluebook citation lookup
+        "include_content": True,                # Full opinion HTML
+        "include_detailed_treatments": True,    # How other courts treated this opinion
+    },
+    headers={"Authorization": f"Bearer {MIDPAGE_API_KEY}"},
+)
+
+opinion = response.json()["opinions"][0]
+# → case_name, court_id, citations[], citation_count, overall_treatment, html_content
+```
+
+### How Legal Research Flows Into Results
+
+Every legal citation the LawAgent finds through Midpage is persisted to the `legal_refs` table and linked to specific violations:
+
+```mermaid
+sequenceDiagram
+    participant LA as LawAgent
+    participant MP as Midpage MCP
+    participant DB as SQLite
+
+    Note over LA: Received clauses from ContractAgent
+
+    LA->>MP: search("data sharing restrictions CCPA")
+    MP-->>LA: opinion_id: 7228818, case_name: "FTC v. Wyndham"
+
+    LA->>MP: findInOpinion(opinionId: "7228818", query: "third-party data processor")
+    MP-->>LA: "The FTC has authority to regulate unfair data practices..."
+
+    LA->>MP: analyzeOpinion(opinionId: "7228818", question: "Does this apply to SaaS vendors?")
+    MP-->>LA: "Yes — the court held that cloud service providers..."
+
+    LA-->>LA: Synthesize findings into legal analysis
+
+    Note over LA,DB: Results persisted via Moderator → result_parser
+
+    LA->>DB: INSERT legal_refs (citation, case_name, court_name, opinion_id, relevance)
+    LA->>DB: INSERT violations (clause_id, legal_ref_id, severity, explanation, proposed_amendment)
+```
+
+The `legal_refs` table stores the Midpage `opinion_id` alongside the Bluebook citation, enabling direct deep-links back to the full opinion on the Midpage platform. Each violation record references both the contract clause it applies to and the legal authority that supports it — creating a fully traceable chain from contract text to legal precedent.
+
+| Field | Source | Example |
+|-------|--------|---------|
+| `citation` | Midpage search result | `CCPA §1798.140(v)` |
+| `case_name` | Midpage opinion metadata | `FTC v. Wyndham Worldwide Corp.` |
+| `court_name` | Midpage court lookup | `U.S. Court of Appeals for the Third Circuit` |
+| `opinion_id` | Midpage opinion ID | `7228818` |
+| `relevance` | LawAgent analysis | `Establishes FTC authority over data processor obligations` |
+
+---
+
 ## Database Schema
 
 ```mermaid
