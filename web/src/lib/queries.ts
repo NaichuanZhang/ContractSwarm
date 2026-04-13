@@ -121,21 +121,6 @@ export function getGraphData(assessmentId: string) {
 
     for (const clause of clauseRows) {
       const clauseNodeId = `clause-${clause.id}`;
-      nodes.push({
-        id: clauseNodeId,
-        type: "clause",
-        data: {
-          label: clause.clauseType,
-          sectionRef: clause.sectionRef,
-          riskLevel: clause.riskLevel,
-          text: clause.clauseText.slice(0, 200),
-        },
-      });
-      edges.push({
-        id: `e-${clientNodeId}-${clauseNodeId}`,
-        source: clientNodeId,
-        target: clauseNodeId,
-      });
 
       const violationRows = db
         .select({
@@ -146,6 +131,32 @@ export function getGraphData(assessmentId: string) {
         .leftJoin(legalRefs, eq(violations.legalRefId, legalRefs.id))
         .where(eq(violations.clauseId, clause.id))
         .all();
+
+      nodes.push({
+        id: clauseNodeId,
+        type: "clause",
+        data: {
+          label: clause.clauseType,
+          clauseType: clause.clauseType,
+          sectionRef: clause.sectionRef,
+          riskLevel: clause.riskLevel,
+          text: clause.clauseText.slice(0, 200),
+          clauseText: clause.clauseText,
+          violations: violationRows.map(({ violation, legalRef }) => ({
+            severity: violation.severity,
+            explanation: violation.explanation,
+            originalLanguage: violation.originalLanguage,
+            legalRef: legalRef
+              ? { citation: legalRef.citation, caseName: legalRef.caseName }
+              : null,
+          })),
+        },
+      });
+      edges.push({
+        id: `e-${clientNodeId}-${clauseNodeId}`,
+        source: clientNodeId,
+        target: clauseNodeId,
+      });
 
       for (const { violation, legalRef } of violationRows) {
         if (legalRef) {

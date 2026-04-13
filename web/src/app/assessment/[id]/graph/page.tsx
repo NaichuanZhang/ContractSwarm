@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -34,6 +34,27 @@ const nodeTypes: NodeTypes = {
   category: CategoryNode,
   law: LawNode,
 };
+
+function getConnectedNodeIds(nodeId: string, edgeList: Edge[]): Set<string> {
+  const adjacency = new Map<string, Set<string>>();
+  for (const edge of edgeList) {
+    if (!adjacency.has(edge.source)) adjacency.set(edge.source, new Set());
+    if (!adjacency.has(edge.target)) adjacency.set(edge.target, new Set());
+    adjacency.get(edge.source)!.add(edge.target);
+    adjacency.get(edge.target)!.add(edge.source);
+  }
+  const visited = new Set<string>();
+  const queue = [nodeId];
+  while (queue.length > 0) {
+    const current = queue.pop()!;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const neighbor of adjacency.get(current) ?? []) {
+      if (!visited.has(neighbor)) queue.push(neighbor);
+    }
+  }
+  return visited;
+}
 
 function layoutNodes(
   rawNodes: Array<{ id: string; type: string; data: Record<string, unknown> }>,
@@ -120,6 +141,7 @@ export default function GraphPage({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [highlightedIds, setHighlightedIds] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     fetch(`/api/assessments/${id}/graph`)
@@ -137,9 +159,46 @@ export default function GraphPage({
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       setSelectedNode(node);
+      const connected = getConnectedNodeIds(node.id, edges);
+      setHighlightedIds(connected);
     },
-    []
+    [edges]
   );
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
+    setHighlightedIds(null);
+  }, []);
+
+  const styledNodes = useMemo(() => {
+    if (!highlightedIds) return nodes;
+    return nodes.map((n) => ({
+      ...n,
+      style: {
+        ...n.style,
+        opacity: highlightedIds.has(n.id) ? 1 : 0.2,
+        transition: "opacity 0.2s ease",
+      },
+    }));
+  }, [nodes, highlightedIds]);
+
+  const styledEdges = useMemo(() => {
+    if (!highlightedIds) return edges;
+    return edges.map((e) => {
+      const isHighlighted =
+        highlightedIds.has(e.source) && highlightedIds.has(e.target);
+      return {
+        ...e,
+        style: {
+          ...e.style,
+          opacity: isHighlighted ? 1 : 0.08,
+          strokeWidth: isHighlighted ? 2.5 : 1,
+          transition: "opacity 0.2s ease",
+        },
+        animated: isHighlighted,
+      };
+    });
+  }, [edges, highlightedIds]);
 
   return (
     <div>
@@ -163,12 +222,13 @@ export default function GraphPage({
           </div>
         ) : (
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            nodes={styledNodes}
+            edges={styledEdges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             proOptions={{ hideAttribution: true }}
@@ -185,7 +245,12 @@ export default function GraphPage({
 
         <GraphSidebar
           node={selectedNode}
-          onClose={() => setSelectedNode(null)}
+          nodes={nodes}
+          edges={edges}
+          onClose={() => {
+            setSelectedNode(null);
+            setHighlightedIds(null);
+          }}
         />
 
         {/* Legend */}

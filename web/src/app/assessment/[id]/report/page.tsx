@@ -57,12 +57,6 @@ interface ReportData {
   clients: ClientReport[];
 }
 
-const RISK_WEIGHTS: Record<string, number> = {
-  high: 1.0,
-  medium: 0.5,
-  low: 0.1,
-};
-
 const formatUSD = (value: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -118,8 +112,10 @@ export default function ReportPage({
   );
   const valueAtRisk = (report?.clients ?? []).reduce((sum, c) => {
     if (c.contractValue == null) return sum;
-    const weight = RISK_WEIGHTS[c.riskScore ?? "low"] ?? 0.1;
-    return sum + c.contractValue * weight;
+    const hasViolations = c.clauses.some((cl) => cl.violations.length > 0);
+    const isAtRisk =
+      c.riskScore === "high" || c.riskScore === "medium" || hasViolations;
+    return isAtRisk ? sum + c.contractValue : sum;
   }, 0);
   const hasContractValues = (report?.clients ?? []).some(
     (c) => c.contractValue != null && c.contractValue > 0
