@@ -70,7 +70,6 @@ Next.js 16 App Router (web/)     Python FastAPI (agents/)
 **agents/.env:**
 - `ANTHROPIC_API_KEY` — Required for Claude Agent SDK
 - `MIDPAGE_API_KEY` — Midpage legal research API (optional, agents work without it)
-- `THENVOI_WS_URL` / `THENVOI_REST_URL` — Thenvoi platform (optional, requires Enterprise plan for agent registration)
 
 ## Database Schema (SQLite)
 
@@ -78,7 +77,7 @@ Next.js 16 App Router (web/)     Python FastAPI (agents/)
 
 - `assessments` — one per swarm run (vendor + status + counts)
 - `contracts` — one per client PDF (linked to assessment, stores extracted text + risk/recommendation)
-- `agent_rooms` — one per contract analysis (links to Thenvoi chat or "direct-mode")
+- `agent_rooms` — one per contract analysis
 - `agent_messages` — agent reasoning log (indexed by room_id + created_at)
 - `clauses` — extracted contract clauses with type and risk level
 - `legal_refs` — US case law citations from agent analysis

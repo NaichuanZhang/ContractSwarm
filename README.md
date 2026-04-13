@@ -191,112 +191,6 @@ Each contract gets its own independent agent team. All teams run in parallel via
 
 ---
 
-## Thenvoi Integration
-
-ContractSwarm is built on [Thenvoi](https://app.thenvoi.com), a multi-agent communication platform that provides the real-time messaging infrastructure for agent coordination. Each contract analysis maps to a **Thenvoi chatroom** — agents connect via WebSocket, exchange findings through structured messages, and produce results visible to both humans and other agents in the same room.
-
-```mermaid
-graph TB
-    subgraph "Thenvoi Platform"
-        WS["WebSocket Gateway\nwss://app.thenvoi.com"]
-        REST["REST API\nhttps://app.thenvoi.com"]
-        CR1["Chatroom: Acme Corp MSA"]
-        CR2["Chatroom: Globex DPA"]
-        CRN["Chatroom: Initech Services"]
-        WS --- CR1
-        WS --- CR2
-        WS --- CRN
-    end
-
-    subgraph "ContractSwarm Backend"
-        ORC["Orchestrator\nasyncio.gather × N"]
-        ORC -->|"Agent.create per team"| WS
-        ORC -->|"Create chatroom"| REST
-    end
-
-    subgraph "Acme Corp Agent Team"
-        M1[Moderator] -->|WebSocket| CR1
-        C1[ContractAgent] -->|WebSocket| CR1
-        L1[LawAgent] -->|WebSocket| CR1
-    end
-
-    subgraph "Globex Agent Team"
-        M2[Moderator] -->|WebSocket| CR2
-        C2[ContractAgent] -->|WebSocket| CR2
-        L2[LawAgent] -->|WebSocket| CR2
-    end
-
-    UI["Next.js Frontend\nSSE Stream"] -.->|"Read agent messages"| REST
-
-    style WS fill:#8B6F47,color:#fff
-    style REST fill:#8B6F47,color:#fff
-    style CR1 fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
-    style CR2 fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
-    style CRN fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
-    style M1 fill:#8B6F47,color:#fff
-    style C1 fill:#4A9E6E,color:#fff
-    style L1 fill:#6B5CE7,color:#fff
-    style M2 fill:#8B6F47,color:#fff
-    style C2 fill:#4A9E6E,color:#fff
-    style L2 fill:#6B5CE7,color:#fff
-```
-
-### Chatroom-per-Contract Pattern
-
-Every contract analysis gets its own dedicated Thenvoi chatroom. The `agent_rooms` table stores the mapping via `thenvoi_chat_id`:
-
-| Contract | Thenvoi Chatroom | Agents |
-|----------|-----------------|--------|
-| Acme Corp MSA | `chatroom-abc123` | Moderator, ContractAgent, LawAgent |
-| Globex DPA | `chatroom-def456` | Moderator, ContractAgent, LawAgent |
-| Initech Services | `chatroom-ghi789` | Moderator, ContractAgent, LawAgent |
-
-This pattern means every agent conversation is **observable** — humans can join any chatroom on the Thenvoi platform to watch the analysis unfold in real-time, or review the full transcript after completion. Every message exchanged between agents is persisted to the `agent_messages` table and streamed to the frontend via SSE.
-
-### SDK Usage
-
-Agents connect to Thenvoi using `thenvoi-sdk[claude_sdk]`, which wraps Claude Agent SDK behind Thenvoi's adapter layer:
-
-```python
-from thenvoi import Agent
-from thenvoi.adapters import ClaudeSDKAdapter
-from thenvoi.core.types import AdapterFeatures, Emit
-
-# Wrap Claude Agent SDK with Thenvoi's communication adapter
-adapter = ClaudeSDKAdapter(
-    model="claude-haiku-4-5-20251001",
-    custom_section=agent_prompt,
-    features=AdapterFeatures(emit={Emit.EXECUTION}),
-)
-
-# Create an agent connected to the Thenvoi platform
-agent = Agent.create(
-    adapter=adapter,
-    agent_id=agent_id,        # Registered at app.thenvoi.com
-    api_key=api_key,           # Per-agent API key
-    ws_url="wss://app.thenvoi.com/api/v1/socket/websocket",
-    rest_url="https://app.thenvoi.com",
-)
-
-# Agents run concurrently — each connected via its own WebSocket
-await asyncio.gather(moderator.run(), contract_agent.run(), law_agent.run())
-```
-
-The `ClaudeSDKAdapter` bridges Claude Agent SDK's `query()` interface with Thenvoi's WebSocket messaging — agents reason with Claude while communicating through Thenvoi chatrooms. The `AdapterFeatures(emit={Emit.EXECUTION})` flag streams execution-level events (tool calls, subagent invocations) into the chatroom, making the full reasoning chain visible to observers.
-
-### Dual Mode Operation
-
-ContractSwarm supports two execution modes, ensuring the system works with or without a Thenvoi account:
-
-| Mode | `thenvoi_chat_id` | Communication | Use Case |
-|------|-------------------|---------------|----------|
-| **Thenvoi Platform** | `chatroom-{uuid}` | Real WebSocket chatrooms | Production — full observability, human-in-the-loop |
-| **Direct** | `"direct-mode"` | Claude Agent SDK `query()` + subagents | Development — no Thenvoi account needed |
-
-Set `THENVOI_WS_URL` and `THENVOI_REST_URL` in your environment to enable platform mode. Without them, the system falls back to direct mode using Claude Agent SDK's native subagent pattern — same analysis, same results, but without the real-time chatroom observability that Thenvoi provides.
-
----
-
 ## Multi-Agent Orchestration
 
 The swarm pattern runs N independent agent teams in true parallel — one team per contract, all executing concurrently via `asyncio.gather()`. Each team follows an identical 3-step workflow orchestrated by a Moderator agent.
@@ -379,7 +273,7 @@ sequenceDiagram
     participant LA as LawAgent (haiku)
     participant DB as SQLite
 
-    O->>DB: Create agent_room (thenvoi_chat_id)
+    O->>DB: Create agent_room
     O->>M: query(moderator_prompt + contract_text)
 
     rect rgb(74, 158, 110, 0.1)
@@ -611,7 +505,7 @@ erDiagram
     agent_rooms {
         text id PK
         text contract_id FK
-        text thenvoi_chat_id
+        text chat_id
         text status
         text created_at
     }
@@ -851,7 +745,7 @@ contract-swarm/
 ├── scripts/
 │   ├── setup-db.sql              # SQLite schema
 │   └── generate-sample-contracts.py
-└── examples/thenvoi/             # Reference implementations
+└── examples/                     # Reference implementations
 ```
 
 ---
