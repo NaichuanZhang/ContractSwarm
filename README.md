@@ -191,6 +191,237 @@ Each contract gets its own independent agent team. All teams run in parallel via
 
 ---
 
+## Thenvoi Integration
+
+ContractSwarm is built on [Thenvoi](https://app.thenvoi.com), a multi-agent communication platform that provides the real-time messaging infrastructure for agent coordination. Each contract analysis maps to a **Thenvoi chatroom** — agents connect via WebSocket, exchange findings through structured messages, and produce results visible to both humans and other agents in the same room.
+
+```mermaid
+graph TB
+    subgraph "Thenvoi Platform"
+        WS["WebSocket Gateway\nwss://app.thenvoi.com"]
+        REST["REST API\nhttps://app.thenvoi.com"]
+        CR1["Chatroom: Acme Corp MSA"]
+        CR2["Chatroom: Globex DPA"]
+        CRN["Chatroom: Initech Services"]
+        WS --- CR1
+        WS --- CR2
+        WS --- CRN
+    end
+
+    subgraph "ContractSwarm Backend"
+        ORC["Orchestrator\nasyncio.gather × N"]
+        ORC -->|"Agent.create per team"| WS
+        ORC -->|"Create chatroom"| REST
+    end
+
+    subgraph "Acme Corp Agent Team"
+        M1[Moderator] -->|WebSocket| CR1
+        C1[ContractAgent] -->|WebSocket| CR1
+        L1[LawAgent] -->|WebSocket| CR1
+    end
+
+    subgraph "Globex Agent Team"
+        M2[Moderator] -->|WebSocket| CR2
+        C2[ContractAgent] -->|WebSocket| CR2
+        L2[LawAgent] -->|WebSocket| CR2
+    end
+
+    UI["Next.js Frontend\nSSE Stream"] -.->|"Read agent messages"| REST
+
+    style WS fill:#8B6F47,color:#fff
+    style REST fill:#8B6F47,color:#fff
+    style CR1 fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
+    style CR2 fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
+    style CRN fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
+    style M1 fill:#8B6F47,color:#fff
+    style C1 fill:#4A9E6E,color:#fff
+    style L1 fill:#6B5CE7,color:#fff
+    style M2 fill:#8B6F47,color:#fff
+    style C2 fill:#4A9E6E,color:#fff
+    style L2 fill:#6B5CE7,color:#fff
+```
+
+### Chatroom-per-Contract Pattern
+
+Every contract analysis gets its own dedicated Thenvoi chatroom. The `agent_rooms` table stores the mapping via `thenvoi_chat_id`:
+
+| Contract | Thenvoi Chatroom | Agents |
+|----------|-----------------|--------|
+| Acme Corp MSA | `chatroom-abc123` | Moderator, ContractAgent, LawAgent |
+| Globex DPA | `chatroom-def456` | Moderator, ContractAgent, LawAgent |
+| Initech Services | `chatroom-ghi789` | Moderator, ContractAgent, LawAgent |
+
+This pattern means every agent conversation is **observable** — humans can join any chatroom on the Thenvoi platform to watch the analysis unfold in real-time, or review the full transcript after completion. Every message exchanged between agents is persisted to the `agent_messages` table and streamed to the frontend via SSE.
+
+### SDK Usage
+
+Agents connect to Thenvoi using `thenvoi-sdk[claude_sdk]`, which wraps Claude Agent SDK behind Thenvoi's adapter layer:
+
+```python
+from thenvoi import Agent
+from thenvoi.adapters import ClaudeSDKAdapter
+from thenvoi.core.types import AdapterFeatures, Emit
+
+# Wrap Claude Agent SDK with Thenvoi's communication adapter
+adapter = ClaudeSDKAdapter(
+    model="claude-haiku-4-5-20251001",
+    custom_section=agent_prompt,
+    features=AdapterFeatures(emit={Emit.EXECUTION}),
+)
+
+# Create an agent connected to the Thenvoi platform
+agent = Agent.create(
+    adapter=adapter,
+    agent_id=agent_id,        # Registered at app.thenvoi.com
+    api_key=api_key,           # Per-agent API key
+    ws_url="wss://app.thenvoi.com/api/v1/socket/websocket",
+    rest_url="https://app.thenvoi.com",
+)
+
+# Agents run concurrently — each connected via its own WebSocket
+await asyncio.gather(moderator.run(), contract_agent.run(), law_agent.run())
+```
+
+The `ClaudeSDKAdapter` bridges Claude Agent SDK's `query()` interface with Thenvoi's WebSocket messaging — agents reason with Claude while communicating through Thenvoi chatrooms. The `AdapterFeatures(emit={Emit.EXECUTION})` flag streams execution-level events (tool calls, subagent invocations) into the chatroom, making the full reasoning chain visible to observers.
+
+### Dual Mode Operation
+
+ContractSwarm supports two execution modes, ensuring the system works with or without a Thenvoi account:
+
+| Mode | `thenvoi_chat_id` | Communication | Use Case |
+|------|-------------------|---------------|----------|
+| **Thenvoi Platform** | `chatroom-{uuid}` | Real WebSocket chatrooms | Production — full observability, human-in-the-loop |
+| **Direct** | `"direct-mode"` | Claude Agent SDK `query()` + subagents | Development — no Thenvoi account needed |
+
+Set `THENVOI_WS_URL` and `THENVOI_REST_URL` in your environment to enable platform mode. Without them, the system falls back to direct mode using Claude Agent SDK's native subagent pattern — same analysis, same results, but without the real-time chatroom observability that Thenvoi provides.
+
+---
+
+## Multi-Agent Orchestration
+
+The swarm pattern runs N independent agent teams in true parallel — one team per contract, all executing concurrently via `asyncio.gather()`. Each team follows an identical 3-step workflow orchestrated by a Moderator agent.
+
+### Parallel Execution Model
+
+```mermaid
+graph TB
+    ORC["run_assessment()"] -->|"Load contracts from DB"| EXTRACT
+
+    subgraph "Phase 1: PDF Extraction"
+        EXTRACT["pdfplumber\n(sequential)"] -->|"raw_text → DB"| READY["All texts ready"]
+    end
+
+    READY -->|"asyncio.gather(×N)"| TEAM1
+    READY -->|"asyncio.gather(×N)"| TEAM2
+    READY -->|"asyncio.gather(×N)"| TEAMN
+
+    subgraph "Phase 2: Parallel Analysis"
+        subgraph "Team 1 — Acme Corp"
+            TEAM1[Moderator] -->|Step 1| CA1[ContractAgent]
+            CA1 -->|Clauses| TEAM1
+            TEAM1 -->|Step 2| LA1[LawAgent]
+            LA1 -->|Citations| TEAM1
+            TEAM1 -->|Step 3| R1[JSON Result]
+        end
+
+        subgraph "Team 2 — Globex"
+            TEAM2[Moderator] -->|Step 1| CA2[ContractAgent]
+            CA2 -->|Clauses| TEAM2
+            TEAM2 -->|Step 2| LA2[LawAgent]
+            LA2 -->|Citations| TEAM2
+            TEAM2 -->|Step 3| R2[JSON Result]
+        end
+
+        subgraph "Team N — Initech"
+            TEAMN[Moderator] -->|Step 1| CAN[ContractAgent]
+            CAN -->|Clauses| TEAMN
+            TEAMN -->|Step 2| LAN[LawAgent]
+            LAN -->|Citations| TEAMN
+            TEAMN -->|Step 3| RN[JSON Result]
+        end
+    end
+
+    R1 -->|persist_result| DB[(SQLite)]
+    R2 -->|persist_result| DB
+    RN -->|persist_result| DB
+
+    style TEAM1 fill:#8B6F47,color:#fff
+    style TEAM2 fill:#8B6F47,color:#fff
+    style TEAMN fill:#8B6F47,color:#fff
+    style CA1 fill:#4A9E6E,color:#fff
+    style CA2 fill:#4A9E6E,color:#fff
+    style CAN fill:#4A9E6E,color:#fff
+    style LA1 fill:#6B5CE7,color:#fff
+    style LA2 fill:#6B5CE7,color:#fff
+    style LAN fill:#6B5CE7,color:#fff
+    style DB fill:#F0EDE8,color:#1A1A1A,stroke:#E5E0DB
+```
+
+### 3-Agent Hierarchy
+
+Each contract team is a self-contained unit with a strict hierarchy:
+
+| Agent | Role | Model | Tools | Responsibilities |
+|-------|------|-------|-------|-----------------|
+| **Moderator** | Orchestrator | `claude-haiku-4-5` | `Agent` (invoke subagents) | Coordinates 3-step workflow, synthesizes final JSON result |
+| **ContractAgent** | Specialist | `claude-haiku-4-5` | None (pure reasoning) | Clause extraction, risk rating, contract value identification |
+| **LawAgent** | Specialist | `claude-haiku-4-5` | None (pure reasoning) | US legal research — CCPA + HIPAA only, case citations |
+
+The Moderator is the only agent with tool access — it uses Claude Agent SDK's `Agent` tool to invoke the two specialists as subagents. Specialists have `tools=[]` (no file, shell, or MCP access), operating as pure reasoning agents that respond to the Moderator's prompts.
+
+### Per-Contract Workflow
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator
+    participant M as Moderator (haiku)
+    participant CA as ContractAgent (haiku)
+    participant LA as LawAgent (haiku)
+    participant DB as SQLite
+
+    O->>DB: Create agent_room (thenvoi_chat_id)
+    O->>M: query(moderator_prompt + contract_text)
+
+    rect rgb(74, 158, 110, 0.1)
+        Note over M,CA: Step 1 — Clause Extraction
+        M->>CA: "Analyze contract for {client}. Extract restrictive clauses for vendor: {desc}"
+        CA-->>M: Structured clause list (type, section_ref, text, risk_level)
+    end
+
+    rect rgb(107, 92, 231, 0.1)
+        Note over M,LA: Step 2 — Legal Research
+        M->>LA: "Research legal implications. CLAUSES: {clause_list}"
+        LA-->>M: US law citations per clause (CCPA §1798.x, HIPAA §164.x)
+    end
+
+    rect rgb(139, 111, 71, 0.1)
+        Note over M: Step 3 — Synthesis
+        M->>M: Cross-reference clauses with legal findings, generate final JSON
+    end
+
+    M-->>O: ResultMessage (structured JSON)
+    O->>DB: persist_result → clauses, violations, legal_refs
+    O->>DB: UPDATE contract SET status=completed
+
+    loop During entire analysis
+        O->>DB: INSERT agent_messages (real-time)
+        Note over DB: SSE stream → frontend every 500ms
+    end
+```
+
+### Claude Agent SDK Integration
+
+The orchestrator uses Claude Agent SDK's core primitives to wire up the multi-agent system:
+
+- **`ClaudeAgentOptions`** — configures the Moderator with `model="haiku"`, `allowed_tools=["Agent"]`, and `permission_mode="bypassPermissions"`
+- **`AgentDefinition`** — defines each subagent with a `description` (used by the Agent tool for routing), a `prompt` (system instructions), and `model="haiku"`
+- **`query()`** — async generator that streams `AssistantMessage` and `ResultMessage` events; each `TextBlock` is saved to `agent_messages` for the frontend SSE stream
+- **`agents={}`** — the named subagent registry passed to the Moderator, enabling `Agent` tool invocations by name (`"contract_agent"`, `"law_agent"`)
+
+Contract text is truncated to 6,000 characters and embedded only in the Moderator's prompt — subagent definitions stay lightweight. The Moderator passes relevant context when invoking each specialist, keeping token usage efficient across the 3-agent chain.
+
+---
+
 ## Database Schema
 
 ```mermaid
